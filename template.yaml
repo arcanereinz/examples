@@ -1,53 +1,189 @@
 AWSTemplateFormatVersion: 2010-09-09
 Transform: AWS::Serverless-2016-10-31
 Resources:
-  Api:
-    Type: AWS::Serverless::Api
+  Bastion:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Metadata:
+      StackeryType: bastion
     Properties:
-      Name: !Sub
-        - ${ResourceName} From Stack ${StackTagName} Environment ${EnvironmentTagName}
-        - ResourceName: Api
-      StageName: !Ref EnvironmentAPIGatewayStageName
-      DefinitionBody:
-        swagger: '2.0'
-        info: {}
-        paths:
-          /:
-            get:
-              x-amazon-apigateway-integration:
-                httpMethod: POST
-                type: aws_proxy
-                uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${Function.Arn}/invocations
-              responses: {}
-      EndpointConfiguration: REGIONAL
-      TracingEnabled: true
-  Function:
-    Type: AWS::Serverless::Function
+      LaunchConfigurationName: !Ref BastionLaunchConfiguration
+      MaxSize: 2
+      MinSize: 1
+      DesiredCapacity: 1
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Bastion ${ResourceName} Instance
+            - ResourceName: Bastion
+          PropagateAtLaunch: true
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 1
+  BastionIAMRole:
+    Type: AWS::IAM::Role
     Properties:
-      FunctionName: !Sub ${AWS::StackName}-Function
-      Description: !Sub
-        - Stack ${StackTagName} Environment ${EnvironmentTagName} Function ${ResourceName}
-        - ResourceName: Function
-      CodeUri: src/Function
-      Handler: index.handler
-      Runtime: nodejs12.x
-      MemorySize: 3008
-      Timeout: 30
-      Tracing: Active
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: ec2.amazonaws.com
+          Action: sts:AssumeRole
+      RoleName: !Sub ${AWS::StackName}-Bastion
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
       Policies:
-        - AWSXrayWriteOnlyAccess
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Sub arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/${EnvironmentTagName}/*
-      Events:
-        ApiGET:
-          Type: Api
-          Properties:
-            Path: /
-            Method: GET
-            RestApiId: !Ref Api
-      Environment:
-        Variables:
-          SECRETS_NAMESPACE: !Sub /${EnvironmentTagName}/
+        - PolicyName: BastionPermissions
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                  - cloudwatch:GetMetricStatistics
+                  - cloudwatch:ListMetrics
+                  - ec2:DescribeTags
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:DescribeLogStreams
+                  - logs:PutLogEvents
+                Resource:
+                  - arn:aws:logs:*:*:log-group:/stackery/bastion/*
+                  - arn:aws:logs:*:*:log-group:/stackery/bastion/*:log-stream:*
+  BastionIAMInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref BastionIAMRole
+  BastionInstancesSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Bastion Instances Security Group
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: '-1'
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Bastion ${ResourceName} Instances Security Group
+            - ResourceName: Bastion
+  BastionLaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      IamInstanceProfile: !Ref BastionIAMInstanceProfile
+      ImageId: !Ref AmazonLinux2ImageId
+      InstanceType: t2.nano
+      SecurityGroups:
+        - !Ref BastionInstancesSecurityGroup
+      UserData: !Base64
+        Fn::Sub:
+          - |-
+            Content-Type: multipart/mixed; boundary="==BOUNDARY=="
+            MIME-Version: 1.0
+
+            --==BOUNDARY==
+            MIME-Version: 1.0
+            Content-Type: text/x-shellscript
+
+            #!/bin/bash
+            # Install awslogs, the jq JSON parser, and cfn-signal stuff
+            yum install -y awslogs jq
+
+            # Inject the CloudWatch Logs configuration file contents
+            cat > /etc/awslogs/awslogs.conf <<- EOF
+            [general]
+            state_file = /var/lib/awslogs/agent-state
+
+            [/var/log/dmesg]
+            file = /var/log/dmesg
+            log_group_name = /${AWS::StackName}-${ResourceId}/dmesg
+            log_stream_name = {instance_id}
+
+            [/var/log/messages]
+            file = /var/log/messages
+            log_group_name = /${AWS::StackName}-${ResourceId}/messages
+            log_stream_name = {instance_id}
+            datetime_format = %b %d %H:%M:%S
+
+            [/var/log/secure]
+            file = /var/log/secure
+            log_group_name = /${AWS::StackName}-${ResourceId}/secure
+            log_stream_name = {instance_id}
+
+            [/var/log/auth.log]
+            file = /var/log/auth.log
+            log_group_name = /${AWS::StackName}-${ResourceId}/auth.log
+            log_stream_name = {instance_id}
+
+            EOF
+
+            exec 2>>/var/log/cloudwatch-logs-start.log
+            set -x
+
+            # Grab the instance id ARN from instance metadata
+            instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+
+            # Replace the instance ID placeholders with the actual values
+            sed -i -e "s/{instance_id}/$instance_id/g" /etc/awslogs/awslogs.conf
+
+            service awslogs start
+            chkconfig awslogs on
+
+            ########################################################################
+            # Create user logins and add their ssh key
+            ########################################################################
+            echo '${SSHKeys}' > ~ec2-user/users.json
+            filename="user.keys"
+            jq -r 'to_entries[] | "\(.key) \(.value)"' ~ec2-user/users.json > "$filename"
+
+            while read -r user key
+            do
+              echo "Adding user: $user"
+              useradd -m $user
+              homedir=$( getent passwd "$user" | cut -d: -f6 )
+              cd $homedir
+              mkdir .ssh
+              chmod 700 .ssh
+              chown $user:$user .ssh
+              echo "$key" >> .ssh/authorized_keys
+              chmod 600 .ssh/authorized_keys
+              chown $user:$user .ssh/authorized_keys
+
+            done < "$filename"
+
+            rm "$filename"
+            rm ~ec2-user/users.json
+
+            --==BOUNDARY==
+            MIME-Version: 1.0
+            Content-Type: text/x-shellscript
+
+            #!/bin/bash
+            # Set the region to send CloudWatch Logs data to (the region where the instance is located)
+            region=$(curl 169.254.169.254/latest/meta-data/placement/availability-zone | sed s'/.$//')
+            sed -i -e "s/region = us-east-1/region = $region/g" /etc/awslogs/awscli.conf
+
+            --==BOUNDARY==
+          - SSHKeys: '{"<username1>":"<public key>","<username2>":"<public key>"}'
+            ResourceId: Bastion
+  BastionSSMAgentAutoUpdate:
+    Type: AWS::SSM::Association
+    Properties:
+      AssociationName: StackeryBastionSSMAgentAutoUpdate
+      Name: AWS-UpdateSSMAgent
+      ScheduleExpression: rate(1 day)
+      Targets:
+        - Key: tag:aws:autoscaling:groupName
+          Values:
+            - !Ref Bastion
 Parameters:
   StackTagName:
     Type: String
@@ -55,6 +191,6 @@ Parameters:
   EnvironmentTagName:
     Type: String
     Description: Environment Name (injected by Stackery at deployment time)
-  EnvironmentAPIGatewayStageName:
-    Type: String
-    Description: Environment name used for API Gateway Stage names (injected by Stackery at deployment time)
+  AmazonLinux2ImageId:
+    Type: AWS::EC2::Image::Id
+    Description: Latest Amazon Linux 2 AMI ID (injected by Stackery at deployment time)
