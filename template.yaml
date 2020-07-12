@@ -172,7 +172,7 @@ Resources:
             sed -i -e "s/region = us-east-1/region = $region/g" /etc/awslogs/awscli.conf
 
             --==BOUNDARY==
-          - SSHKeys: '{"<username1>":"<public key>","<username2>":"<public key>"}'
+          - SSHKeys: '{"nchan":"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQClV1z02TqZebVXpK7I+WAbmknB/tYX2j5R9Z7HmWKTcxt6PMnozZbIWQp0qRWaGX25Kw8pzwhqlZylUPZpn4sge1UGkTDF+uanlHShUWuGVXwFCsYhleRdxb/gd8tlqwGhWFjv1JZ6hSML4MB9YwbAb+Qb86IBwQFkZ1t3y79frzR3rNBIv7mfmDKu3qI0s5ek91O5AqfZJYnjA9CNV856LDskjs/L3ABjStc+SoHULjymqKYv7GkqaQ4nUTZeu67JH6/8juPltXMpDmKnyGXpFdZerAys7ibMCltMLlYinopiprHVl5EktvoV2Bf9PWkFu8aML+8zuB7uA+fCrFb4PvgufhnBPu2TiZyuZc1Mi4s9byTv5hdDULikaUSZut33Y5D4H2232MlCzYoLeou7pG+NLqDopK+ZI8udT2W2FqyvU6fJ+LgA3Wnl3g9fh6L9C/TfqgqpRXuNk++q20wyxPAyr8MMn+QOtEcZaP2CPk0dY17fUp9Sx0ZkHr+KiKs="}'
             ResourceId: Bastion
   BastionSSMAgentAutoUpdate:
     Type: AWS::SSM::Association
