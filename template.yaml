@@ -29,6 +29,8 @@ Resources:
         Variables:
           VALIDATION_DOMAIN: !Ref EnvConfigvalidationDomainAsString
           SECRETS_NAMESPACE: !Sub /${EnvironmentTagName}/
+      Layers:
+        - !Ref Layer
   MyApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -49,6 +51,14 @@ Resources:
               responses: {}
       EndpointConfiguration: REGIONAL
       TracingEnabled: true
+  Layer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      Description: !Sub
+        - Stack ${StackTagName} Environment ${EnvironmentTagName} Layer ${ResourceName}
+        - ResourceName: Layer
+      ContentUri: src/Layer
+      RetentionPolicy: Retain
 Parameters:
   StackTagName:
     Type: String
