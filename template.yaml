@@ -58,6 +58,8 @@ Resources:
         - Stack ${StackTagName} Environment ${EnvironmentTagName} Layer ${ResourceName}
         - ResourceName: Layer
       ContentUri: src/Layer
+      CompatibleRuntimes:
+        - nodejs12.x
       RetentionPolicy: Retain
 Parameters:
   StackTagName:
