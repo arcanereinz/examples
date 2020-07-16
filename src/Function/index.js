@@ -8,7 +8,7 @@ exports.handler = async (event, context) => {
 
     let apiKey;
     try {
-        apiKey = await secrets.getSecrets('apiKey');
+        await secrets.setEnv('apiKey');
     } catch (exception) {
         throw exception;
     }
@@ -19,7 +19,8 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({
             source: 'users', // print
             event,
-            apiKey,
+            MySecret: process.env.MySecret,
+            OtherSecret: process.env.OtherSecret,
         }),
         isBase64Encoded: false,
     };
