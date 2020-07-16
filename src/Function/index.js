@@ -19,7 +19,7 @@ exports.handler = async (event, context) => {
   const response = await secretsManager.getSecretValue(params).promise();
 
   // Accessing the secret's value of the response object
-  const apiKey = response.SecretString;
+  const apiKey = JSON.parse(response.SecretString);
 
   return {
     statusCode: 200,
