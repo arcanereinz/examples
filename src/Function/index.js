@@ -24,8 +24,7 @@ exports.handler = async (event, context) => {
   return {
     statusCode: 200,
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ source: 'users', event }),
-    isBase64Encoded: false,
-    apiKey
+    body: JSON.stringify({ source: 'users', event, apiKey }),
+    isBase64Encoded: false
   };
 };
