@@ -1,7 +1,7 @@
 // Import AWS SDK and instantiate a variable for the AWS Secrets Manager
 const AWS = require('aws-sdk');
 const _ = require('lodash');
-const mylayer = require('./mylayer');
+const mylayer = require('mylayer');
 const secretsManager = new AWS.SecretsManager();
 
 // Store the SECRETS_NAMESPACE value from the Function's environment variables
