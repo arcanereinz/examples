@@ -18,6 +18,8 @@ Resources:
         - AWSXrayWriteOnlyAccess
         - AWSSecretsManagerGetSecretValuePolicy:
             SecretArn: !Sub arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/${EnvironmentTagName}/*
+        - S3CrudPolicy:
+            BucketName: !Ref Bucket
       Events:
         MyApiGET:
           Type: Api
@@ -36,6 +38,8 @@ Resources:
         Variables:
           VALIDATION_DOMAIN: !Ref EnvConfigvalidationDomainAsString
           SECRETS_NAMESPACE: !Sub /${EnvironmentTagName}/
+          BUCKET_NAME: !Ref Bucket
+          BUCKET_ARN: !GetAtt Bucket.Arn
       Layers:
         - !Ref Layer
   MyApi:
