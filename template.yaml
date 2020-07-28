@@ -25,6 +25,13 @@ Resources:
             Path: /
             Method: GET
             RestApiId: !Ref MyApi
+        Bucket:
+          Type: S3
+          Properties:
+            Bucket: !Ref Bucket
+            Events:
+              - s3:ObjectCreated:*
+              - s3:ObjectRemoved:*
       Environment:
         Variables:
           VALIDATION_DOMAIN: !Ref EnvConfigvalidationDomainAsString
@@ -61,6 +68,12 @@ Resources:
       CompatibleRuntimes:
         - nodejs12.x
       RetentionPolicy: Retain
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${AWS::StackName}-bucket-${AWS::AccountId}
+      WebsiteConfiguration:
+        IndexDocument: index.html
 Parameters:
   StackTagName:
     Type: String
