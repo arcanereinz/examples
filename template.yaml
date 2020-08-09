@@ -1,83 +1,818 @@
 AWSTemplateFormatVersion: 2010-09-09
 Transform: AWS::Serverless-2016-10-31
 Resources:
-  FunTest:
-    Type: AWS::Serverless::Function
+  GreenVPC:
+    Type: AWS::EC2::VPC
     Properties:
-      FunctionName: !Sub ${AWS::StackName}-FunTest
-      Description: !Sub
-        - Stack ${StackTagName} Environment ${EnvironmentTagName} Function ${ResourceName}
-        - ResourceName: FunTest
-      CodeUri: src/Function
-      Handler: index.handler
-      Runtime: nodejs12.x
-      MemorySize: 3008
-      Timeout: 30
-      Tracing: Active
+      CidrBlock: 10.2.0.0/16
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName}
+            - ResourceName: GreenVPC
+  GreenVPCPrivateSubnet1:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs ''
+      CidrBlock: !Select
+        - 0
+        - !Cidr
+          - 10.2.0.0/16
+          - 4
+          - 14
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Private Subnet 1
+            - ResourceName: GreenVPC
+      VpcId: !Ref GreenVPC
+  GreenVPCPrivateSubnet2:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 1
+        - !GetAZs ''
+      CidrBlock: !Select
+        - 1
+        - !Cidr
+          - 10.2.0.0/16
+          - 4
+          - 14
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Private Subnet 2
+            - ResourceName: GreenVPC
+      VpcId: !Ref GreenVPC
+  GreenVPCPublicSubnet1:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs ''
+      CidrBlock: !Select
+        - 2
+        - !Cidr
+          - 10.2.0.0/16
+          - 4
+          - 14
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Public Subnet 1
+            - ResourceName: GreenVPC
+      VpcId: !Ref GreenVPC
+  GreenVPCPublicSubnet2:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 1
+        - !GetAZs ''
+      CidrBlock: !Select
+        - 3
+        - !Cidr
+          - 10.2.0.0/16
+          - 4
+          - 14
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Public Subnet 2
+            - ResourceName: GreenVPC
+      VpcId: !Ref GreenVPC
+  GreenVPCPrivateSubnet1NatGatewayEIP:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+  GreenVPCPrivateSubnet1NatGateway:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt GreenVPCPrivateSubnet1NatGatewayEIP.AllocationId
+      SubnetId: !Ref GreenVPCPublicSubnet1
+  GreenVPCPrivateSubnet1RouteTable:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Private Subnet 1 Route Table
+            - ResourceName: GreenVPC
+      VpcId: !Ref GreenVPC
+  GreenVPCPrivateSubnet1NatGatewayRoute:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref GreenVPCPrivateSubnet1NatGateway
+      RouteTableId: !Ref GreenVPCPrivateSubnet1RouteTable
+  GreenVPCPrivateSubnet1RouteTableAssociation:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref GreenVPCPrivateSubnet1RouteTable
+      SubnetId: !Ref GreenVPCPrivateSubnet1
+  GreenVPCPrivateSubnet2NatGatewayEIP:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+  GreenVPCPrivateSubnet2NatGateway:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt GreenVPCPrivateSubnet2NatGatewayEIP.AllocationId
+      SubnetId: !Ref GreenVPCPublicSubnet2
+  GreenVPCPrivateSubnet2RouteTable:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Private Subnet 2 Route Table
+            - ResourceName: GreenVPC
+      VpcId: !Ref GreenVPC
+  GreenVPCPrivateSubnet2NatGatewayRoute:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref GreenVPCPrivateSubnet2NatGateway
+      RouteTableId: !Ref GreenVPCPrivateSubnet2RouteTable
+  GreenVPCPrivateSubnet2RouteTableAssociation:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref GreenVPCPrivateSubnet2RouteTable
+      SubnetId: !Ref GreenVPCPrivateSubnet2
+  GreenVPCPublicSubnetsInternetGateway:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Public Subnets Internet Gateway
+            - ResourceName: GreenVPC
+  GreenVPCPublicSubnetsInternetGatewayAttachment:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref GreenVPCPublicSubnetsInternetGateway
+      VpcId: !Ref GreenVPC
+  GreenVPCPublicSubnetsRouteTable:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Public Subnets Route Table
+            - ResourceName: GreenVPC
+      VpcId: !Ref GreenVPC
+  GreenVPCPublicSubnetsInternetGatewayRoute:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref GreenVPCPublicSubnetsInternetGateway
+      RouteTableId: !Ref GreenVPCPublicSubnetsRouteTable
+  GreenVPCPublicSubnet1RouteTableAssociation:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref GreenVPCPublicSubnetsRouteTable
+      SubnetId: !Ref GreenVPCPublicSubnet1
+  GreenVPCPublicSubnet2RouteTableAssociation:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref GreenVPCPublicSubnetsRouteTable
+      SubnetId: !Ref GreenVPCPublicSubnet2
+  BlueVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.3.0.0/16
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName}
+            - ResourceName: BlueVPC
+  BlueVPCPrivateSubnet1:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs ''
+      CidrBlock: !Select
+        - 0
+        - !Cidr
+          - 10.3.0.0/16
+          - 4
+          - 14
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Private Subnet 1
+            - ResourceName: BlueVPC
+      VpcId: !Ref BlueVPC
+  BlueVPCPrivateSubnet2:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 1
+        - !GetAZs ''
+      CidrBlock: !Select
+        - 1
+        - !Cidr
+          - 10.3.0.0/16
+          - 4
+          - 14
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Private Subnet 2
+            - ResourceName: BlueVPC
+      VpcId: !Ref BlueVPC
+  BlueVPCPublicSubnet1:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs ''
+      CidrBlock: !Select
+        - 2
+        - !Cidr
+          - 10.3.0.0/16
+          - 4
+          - 14
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Public Subnet 1
+            - ResourceName: BlueVPC
+      VpcId: !Ref BlueVPC
+  BlueVPCPublicSubnet2:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 1
+        - !GetAZs ''
+      CidrBlock: !Select
+        - 3
+        - !Cidr
+          - 10.3.0.0/16
+          - 4
+          - 14
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Public Subnet 2
+            - ResourceName: BlueVPC
+      VpcId: !Ref BlueVPC
+  BlueVPCPrivateSubnet1NatGatewayEIP:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+  BlueVPCPrivateSubnet1NatGateway:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt BlueVPCPrivateSubnet1NatGatewayEIP.AllocationId
+      SubnetId: !Ref BlueVPCPublicSubnet1
+  BlueVPCPrivateSubnet1RouteTable:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Private Subnet 1 Route Table
+            - ResourceName: BlueVPC
+      VpcId: !Ref BlueVPC
+  BlueVPCPrivateSubnet1NatGatewayRoute:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref BlueVPCPrivateSubnet1NatGateway
+      RouteTableId: !Ref BlueVPCPrivateSubnet1RouteTable
+  BlueVPCPrivateSubnet1RouteTableAssociation:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref BlueVPCPrivateSubnet1RouteTable
+      SubnetId: !Ref BlueVPCPrivateSubnet1
+  BlueVPCPrivateSubnet2NatGatewayEIP:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+  BlueVPCPrivateSubnet2NatGateway:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt BlueVPCPrivateSubnet2NatGatewayEIP.AllocationId
+      SubnetId: !Ref BlueVPCPublicSubnet2
+  BlueVPCPrivateSubnet2RouteTable:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Private Subnet 2 Route Table
+            - ResourceName: BlueVPC
+      VpcId: !Ref BlueVPC
+  BlueVPCPrivateSubnet2NatGatewayRoute:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref BlueVPCPrivateSubnet2NatGateway
+      RouteTableId: !Ref BlueVPCPrivateSubnet2RouteTable
+  BlueVPCPrivateSubnet2RouteTableAssociation:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref BlueVPCPrivateSubnet2RouteTable
+      SubnetId: !Ref BlueVPCPrivateSubnet2
+  BlueVPCPublicSubnetsInternetGateway:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Public Subnets Internet Gateway
+            - ResourceName: BlueVPC
+  BlueVPCPublicSubnetsInternetGatewayAttachment:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref BlueVPCPublicSubnetsInternetGateway
+      VpcId: !Ref BlueVPC
+  BlueVPCPublicSubnetsRouteTable:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Public Subnets Route Table
+            - ResourceName: BlueVPC
+      VpcId: !Ref BlueVPC
+  BlueVPCPublicSubnetsInternetGatewayRoute:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref BlueVPCPublicSubnetsInternetGateway
+      RouteTableId: !Ref BlueVPCPublicSubnetsRouteTable
+  BlueVPCPublicSubnet1RouteTableAssociation:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref BlueVPCPublicSubnetsRouteTable
+      SubnetId: !Ref BlueVPCPublicSubnet1
+  BlueVPCPublicSubnet2RouteTableAssociation:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref BlueVPCPublicSubnetsRouteTable
+      SubnetId: !Ref BlueVPCPublicSubnet2
+  GreenBastion:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Metadata:
+      StackeryType: bastion
+    Properties:
+      LaunchConfigurationName: !Ref GreenBastionLaunchConfiguration
+      MaxSize: 2
+      MinSize: 1
+      DesiredCapacity: 1
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Bastion ${ResourceName} Instance
+            - ResourceName: GreenBastion
+          PropagateAtLaunch: true
+      VPCZoneIdentifier:
+        - !Ref GreenVPCPublicSubnet1
+        - !Ref GreenVPCPublicSubnet2
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 1
+  GreenBastionIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: ec2.amazonaws.com
+          Action: sts:AssumeRole
+      RoleName: !Sub ${AWS::StackName}-GreenBastion
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
       Policies:
-        - AWSXrayWriteOnlyAccess
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Sub arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/${EnvironmentTagName}/*
-        - S3CrudPolicy:
-            BucketName: !Ref Bucket
-      Events:
-        MyApiGET:
-          Type: Api
-          Properties:
-            Path: /
-            Method: GET
-            RestApiId: !Ref MyApi
-        Bucket:
-          Type: S3
-          Properties:
-            Bucket: !Ref Bucket
-            Events:
-              - s3:ObjectCreated:*
-              - s3:ObjectRemoved:*
-      Environment:
-        Variables:
-          VALIDATION_DOMAIN: !Ref EnvConfigvalidationDomainAsString
-          SECRETS_NAMESPACE: !Sub /${EnvironmentTagName}/
-          BUCKET_NAME: !Ref Bucket
-          BUCKET_ARN: !GetAtt Bucket.Arn
-      Layers:
-        - !Ref Layer
-  MyApi:
-    Type: AWS::Serverless::Api
+        - PolicyName: BastionPermissions
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                  - cloudwatch:GetMetricStatistics
+                  - cloudwatch:ListMetrics
+                  - ec2:DescribeTags
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:DescribeLogStreams
+                  - logs:PutLogEvents
+                Resource:
+                  - arn:aws:logs:*:*:log-group:/stackery/bastion/*
+                  - arn:aws:logs:*:*:log-group:/stackery/bastion/*:log-stream:*
+  GreenBastionIAMInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
     Properties:
-      Name: !Sub
-        - ${ResourceName} From Stack ${StackTagName} Environment ${EnvironmentTagName}
-        - ResourceName: MyApi
-      StageName: !Ref EnvironmentAPIGatewayStageName
-      DefinitionBody:
-        swagger: '2.0'
-        info: {}
-        paths:
-          /:
-            get:
-              x-amazon-apigateway-integration:
-                httpMethod: POST
-                type: aws_proxy
-                uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunTest.Arn}/invocations
-              responses: {}
-      EndpointConfiguration: REGIONAL
-      TracingEnabled: true
-  Layer:
-    Type: AWS::Serverless::LayerVersion
+      Roles:
+        - !Ref GreenBastionIAMRole
+  GreenBastionInstancesSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
     Properties:
-      Description: !Sub
-        - Stack ${StackTagName} Environment ${EnvironmentTagName} Layer ${ResourceName}
-        - ResourceName: Layer
-      ContentUri: src/Layer
-      CompatibleRuntimes:
-        - nodejs12.x
-      RetentionPolicy: Retain
-  Bucket:
-    Type: AWS::S3::Bucket
+      GroupDescription: Bastion Instances Security Group
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: '-1'
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Bastion ${ResourceName} Instances Security Group
+            - ResourceName: GreenBastion
+      VpcId: !Ref GreenVPC
+  GreenBastionLaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
-      BucketName: !Sub ${AWS::StackName}-bucket-${AWS::AccountId}
-      WebsiteConfiguration:
-        IndexDocument: index.html
+      IamInstanceProfile: !Ref GreenBastionIAMInstanceProfile
+      ImageId: !Ref AmazonLinux2ImageId
+      InstanceType: t2.nano
+      SecurityGroups:
+        - !Ref GreenBastionInstancesSecurityGroup
+      UserData: !Base64
+        Fn::Sub:
+          - |-
+            Content-Type: multipart/mixed; boundary="==BOUNDARY=="
+            MIME-Version: 1.0
+
+            --==BOUNDARY==
+            MIME-Version: 1.0
+            Content-Type: text/x-shellscript
+
+            #!/bin/bash
+            # Install awslogs, the jq JSON parser, and cfn-signal stuff
+            yum install -y awslogs jq
+
+            # Inject the CloudWatch Logs configuration file contents
+            cat > /etc/awslogs/awslogs.conf <<- EOF
+            [general]
+            state_file = /var/lib/awslogs/agent-state
+
+            [/var/log/dmesg]
+            file = /var/log/dmesg
+            log_group_name = /${AWS::StackName}-${ResourceId}/dmesg
+            log_stream_name = {instance_id}
+
+            [/var/log/messages]
+            file = /var/log/messages
+            log_group_name = /${AWS::StackName}-${ResourceId}/messages
+            log_stream_name = {instance_id}
+            datetime_format = %b %d %H:%M:%S
+
+            [/var/log/secure]
+            file = /var/log/secure
+            log_group_name = /${AWS::StackName}-${ResourceId}/secure
+            log_stream_name = {instance_id}
+
+            [/var/log/auth.log]
+            file = /var/log/auth.log
+            log_group_name = /${AWS::StackName}-${ResourceId}/auth.log
+            log_stream_name = {instance_id}
+
+            EOF
+
+            exec 2>>/var/log/cloudwatch-logs-start.log
+            set -x
+
+            # Grab the instance id ARN from instance metadata
+            instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+
+            # Replace the instance ID placeholders with the actual values
+            sed -i -e "s/{instance_id}/$instance_id/g" /etc/awslogs/awslogs.conf
+
+            service awslogs start
+            chkconfig awslogs on
+
+            ########################################################################
+            # Create user logins and add their ssh key
+            ########################################################################
+            echo '${SSHKeys}' > ~ec2-user/users.json
+            filename="user.keys"
+            jq -r 'to_entries[] | "\(.key) \(.value)"' ~ec2-user/users.json > "$filename"
+
+            while read -r user key
+            do
+              echo "Adding user: $user"
+              useradd -m $user
+              homedir=$( getent passwd "$user" | cut -d: -f6 )
+              cd $homedir
+              mkdir .ssh
+              chmod 700 .ssh
+              chown $user:$user .ssh
+              echo "$key" >> .ssh/authorized_keys
+              chmod 600 .ssh/authorized_keys
+              chown $user:$user .ssh/authorized_keys
+
+            done < "$filename"
+
+            rm "$filename"
+            rm ~ec2-user/users.json
+
+            --==BOUNDARY==
+            MIME-Version: 1.0
+            Content-Type: text/x-shellscript
+
+            #!/bin/bash
+            # Set the region to send CloudWatch Logs data to (the region where the instance is located)
+            region=$(curl 169.254.169.254/latest/meta-data/placement/availability-zone | sed s'/.$//')
+            sed -i -e "s/region = us-east-1/region = $region/g" /etc/awslogs/awscli.conf
+
+            --==BOUNDARY==
+          - SSHKeys: '{"nchan":"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQClV1z02TqZebVXpK7I+WAbmknB/tYX2j5R9Z7HmWKTcxt6PMnozZbIWQp0qRWaGX25Kw8pzwhqlZylUPZpn4sge1UGkTDF+uanlHShUWuGVXwFCsYhleRdxb/gd8tlqwGhWFjv1JZ6hSML4MB9YwbAb+Qb86IBwQFkZ1t3y79frzR3rNBIv7mfmDKu3qI0s5ek91O5AqfZJYnjA9CNV856LDskjs/L3ABjStc+SoHULjymqKYv7GkqaQ4nUTZeu67JH6/8juPltXMpDmKnyGXpFdZerAys7ibMCltMLlYinopiprHVl5EktvoV2Bf9PWkFu8aML+8zuB7uA+fCrFb4PvgufhnBPu2TiZyuZc1Mi4s9byTv5hdDULikaUSZut33Y5D4H2232MlCzYoLeou7pG+NLqDopK+ZI8udT2W2FqyvU6fJ+LgA3Wnl3g9fh6L9C/TfqgqpRXuNk++q20wyxPAyr8MMn+QOtEcZaP2CPk0dY17fUp9Sx0ZkHr+KiKs= nchan"}'
+            ResourceId: GreenBastion
+  GreenBastionSSMAgentAutoUpdate:
+    Type: AWS::SSM::Association
+    Properties:
+      AssociationName: StackeryBastionSSMAgentAutoUpdate
+      Name: AWS-UpdateSSMAgent
+      ScheduleExpression: rate(1 day)
+      Targets:
+        - Key: tag:aws:autoscaling:groupName
+          Values:
+            - !Ref GreenBastion
+  BlueBastion:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Metadata:
+      StackeryType: bastion
+    Properties:
+      LaunchConfigurationName: !Ref BlueBastionLaunchConfiguration
+      MaxSize: 2
+      MinSize: 1
+      DesiredCapacity: 1
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Bastion ${ResourceName} Instance
+            - ResourceName: BlueBastion
+          PropagateAtLaunch: true
+      VPCZoneIdentifier:
+        - !Ref BlueVPCPublicSubnet1
+        - !Ref BlueVPCPublicSubnet2
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 1
+  BlueBastionSSMAgentAutoUpdate:
+    Type: AWS::SSM::Association
+    Properties:
+      AssociationName: StackeryBastionSSMAgentAutoUpdate
+      Name: AWS-UpdateSSMAgent
+      ScheduleExpression: rate(1 day)
+      Targets:
+        - Key: tag:aws:autoscaling:groupName
+          Values:
+            - !Ref BlueBastion
+  BlueBastionIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          Effect: Allow
+          Principal:
+            Service: ec2.amazonaws.com
+          Action: sts:AssumeRole
+      RoleName: !Sub ${AWS::StackName}-BlueBastion
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: BastionPermissions
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                  - cloudwatch:GetMetricStatistics
+                  - cloudwatch:ListMetrics
+                  - ec2:DescribeTags
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:DescribeLogStreams
+                  - logs:PutLogEvents
+                Resource:
+                  - arn:aws:logs:*:*:log-group:/stackery/bastion/*
+                  - arn:aws:logs:*:*:log-group:/stackery/bastion/*:log-stream:*
+  BlueBastionIAMInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref BlueBastionIAMRole
+  BlueBastionLaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      IamInstanceProfile: !Ref BlueBastionIAMInstanceProfile
+      ImageId: !Ref AmazonLinux2ImageId
+      InstanceType: t2.nano
+      SecurityGroups:
+        - !Ref BlueBastionInstancesSecurityGroup
+      UserData: !Base64
+        Fn::Sub:
+          - |-
+            Content-Type: multipart/mixed; boundary="==BOUNDARY=="
+            MIME-Version: 1.0
+
+            --==BOUNDARY==
+            MIME-Version: 1.0
+            Content-Type: text/x-shellscript
+
+            #!/bin/bash
+            # Install awslogs, the jq JSON parser, and cfn-signal stuff
+            yum install -y awslogs jq
+
+            # Inject the CloudWatch Logs configuration file contents
+            cat > /etc/awslogs/awslogs.conf <<- EOF
+            [general]
+            state_file = /var/lib/awslogs/agent-state
+
+            [/var/log/dmesg]
+            file = /var/log/dmesg
+            log_group_name = /${AWS::StackName}-${ResourceId}/dmesg
+            log_stream_name = {instance_id}
+
+            [/var/log/messages]
+            file = /var/log/messages
+            log_group_name = /${AWS::StackName}-${ResourceId}/messages
+            log_stream_name = {instance_id}
+            datetime_format = %b %d %H:%M:%S
+
+            [/var/log/secure]
+            file = /var/log/secure
+            log_group_name = /${AWS::StackName}-${ResourceId}/secure
+            log_stream_name = {instance_id}
+
+            [/var/log/auth.log]
+            file = /var/log/auth.log
+            log_group_name = /${AWS::StackName}-${ResourceId}/auth.log
+            log_stream_name = {instance_id}
+
+            EOF
+
+            exec 2>>/var/log/cloudwatch-logs-start.log
+            set -x
+
+            # Grab the instance id ARN from instance metadata
+            instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+
+            # Replace the instance ID placeholders with the actual values
+            sed -i -e "s/{instance_id}/$instance_id/g" /etc/awslogs/awslogs.conf
+
+            service awslogs start
+            chkconfig awslogs on
+
+            ########################################################################
+            # Create user logins and add their ssh key
+            ########################################################################
+            echo '${SSHKeys}' > ~ec2-user/users.json
+            filename="user.keys"
+            jq -r 'to_entries[] | "\(.key) \(.value)"' ~ec2-user/users.json > "$filename"
+
+            while read -r user key
+            do
+              echo "Adding user: $user"
+              useradd -m $user
+              homedir=$( getent passwd "$user" | cut -d: -f6 )
+              cd $homedir
+              mkdir .ssh
+              chmod 700 .ssh
+              chown $user:$user .ssh
+              echo "$key" >> .ssh/authorized_keys
+              chmod 600 .ssh/authorized_keys
+              chown $user:$user .ssh/authorized_keys
+
+            done < "$filename"
+
+            rm "$filename"
+            rm ~ec2-user/users.json
+
+            --==BOUNDARY==
+            MIME-Version: 1.0
+            Content-Type: text/x-shellscript
+
+            #!/bin/bash
+            # Set the region to send CloudWatch Logs data to (the region where the instance is located)
+            region=$(curl 169.254.169.254/latest/meta-data/placement/availability-zone | sed s'/.$//')
+            sed -i -e "s/region = us-east-1/region = $region/g" /etc/awslogs/awscli.conf
+
+            --==BOUNDARY==
+          - SSHKeys: '{"nchan":"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQClV1z02TqZebVXpK7I+WAbmknB/tYX2j5R9Z7HmWKTcxt6PMnozZbIWQp0qRWaGX25Kw8pzwhqlZylUPZpn4sge1UGkTDF+uanlHShUWuGVXwFCsYhleRdxb/gd8tlqwGhWFjv1JZ6hSML4MB9YwbAb+Qb86IBwQFkZ1t3y79frzR3rNBIv7mfmDKu3qI0s5ek91O5AqfZJYnjA9CNV856LDskjs/L3ABjStc+SoHULjymqKYv7GkqaQ4nUTZeu67JH6/8juPltXMpDmKnyGXpFdZerAys7ibMCltMLlYinopiprHVl5EktvoV2Bf9PWkFu8aML+8zuB7uA+fCrFb4PvgufhnBPu2TiZyuZc1Mi4s9byTv5hdDULikaUSZut33Y5D4H2232MlCzYoLeou7pG+NLqDopK+ZI8udT2W2FqyvU6fJ+LgA3Wnl3g9fh6L9C/TfqgqpRXuNk++q20wyxPAyr8MMn+QOtEcZaP2CPk0dY17fUp9Sx0ZkHr+KiKs= nchan"}'
+            ResourceId: BlueBastion
+  BlueBastionInstancesSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Bastion Instances Security Group
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: '-1'
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Bastion ${ResourceName} Instances Security Group
+            - ResourceName: BlueBastion
+      VpcId: !Ref BlueVPC
 Parameters:
   StackTagName:
     Type: String
@@ -85,12 +820,6 @@ Parameters:
   EnvironmentTagName:
     Type: String
     Description: Environment Name (injected by Stackery at deployment time)
-  EnvironmentAPIGatewayStageName:
-    Type: String
-    Description: Environment name used for API Gateway Stage names (injected by Stackery at deployment time)
-  EnvConfigvalidationDomainAsString:
-    Type: AWS::SSM::Parameter::Value<String>
-    Default: /<EnvironmentName>/validationDomain
-Metadata:
-  EnvConfigParameters:
-    EnvConfigvalidationDomainAsString: validationDomain
+  AmazonLinux2ImageId:
+    Type: AWS::EC2::Image::Id
+    Description: Latest Amazon Linux 2 AMI ID (injected by Stackery at deployment time)
