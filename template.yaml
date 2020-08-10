@@ -21,6 +21,18 @@ Resources:
         - S3CrudPolicy:
             BucketName: !Ref Bucket
         - AWSLambdaENIManagementAccess
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Ref MyDatabaseRootUserSecret
+        - Statement:
+            - Effect: Allow
+              Action:
+                - rds-data:BatchExecuteStatement
+                - rds-data:BeginTransaction
+                - rds-data:CommitTransaction
+                - rds-data:ExecuteStatement
+                - rds-data:RollbackTransaction
+              Resource:
+                - !Sub arn:aws:rds:${AWS::Region}:${AWS::AccountId}:cluster:${MyDatabase}
       Events:
         MyApiGET:
           Type: Api
@@ -41,6 +53,11 @@ Resources:
           SECRETS_NAMESPACE: !Sub /${EnvironmentTagName}/
           BUCKET_NAME: !Ref Bucket
           BUCKET_ARN: !GetAtt Bucket.Arn
+          DB_ID: !Ref MyDatabase
+          DB_ADDRESS: !GetAtt MyDatabase.Endpoint.Address
+          DB_PORT: !GetAtt MyDatabase.Endpoint.Port
+          DB_ARN: !Sub arn:aws:rds:${AWS::Region}:${AWS::AccountId}:db:${MyDatabase}
+          DB_ROOT_USER_SECRET_ARN: !Ref MyDatabaseRootUserSecret
       Layers:
         - !Ref Layer
       VpcConfig:
@@ -304,6 +321,72 @@ Resources:
     Properties:
       RouteTableId: !Ref VirtualNetworkPublicSubnetsRouteTable
       SubnetId: !Ref VirtualNetworkPublicSubnet2
+  MyDatabase:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      BackupRetentionPeriod: '1'
+      DBSubnetGroupName: !Ref MyDatabaseSubnetGroup
+      Engine: mysql
+      MasterUsername: !Sub '{{resolve:secretsmanager:${MyDatabaseRootUserSecret}:SecretString:username}}'
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${MyDatabaseRootUserSecret}:SecretString:password}}'
+      AllocatedStorage: '5'
+      AllowMajorVersionUpgrade: true
+      AutoMinorVersionUpgrade: true
+      CopyTagsToSnapshot: true
+      DBInstanceClass: db.t2.micro
+      EngineVersion: '8.0'
+      MultiAZ: false
+      StorageType: gp2
+      PubliclyAccessible: false
+      VPCSecurityGroups:
+        - !Ref MyDatabaseSecurityGroup
+  MyDatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub
+        - Stack ${StackTagName} Environment ${EnvironmentTagName} Database ${ResourceName} VPC Subnets
+        - ResourceName: MyDatabase
+      SubnetIds:
+        - !Ref VirtualNetworkPrivateSubnet1
+        - !Ref VirtualNetworkPrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Database ${ResourceName} VPC Subnets
+            - ResourceName: MyDatabase
+  MyDatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Database Security Group
+      SecurityGroupIngress:
+        CidrIp: 0.0.0.0/0
+        FromPort: 3306
+        IpProtocol: tcp
+        ToPort: 3306
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Database ${ResourceName} VPC Security Group
+            - ResourceName: MyDatabase
+      VpcId: !Ref VirtualNetwork
+  MyDatabaseRootUserSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: !Sub
+        - Root user login info for Stack ${StackTagName} Environment ${EnvironmentTagName} Database ${ResourceName}
+        - ResourceName: MyDatabase
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "root"}'
+        GenerateStringKey: password
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+      Name: !Sub /${EnvironmentTagName}/${StackTagName}/MyDatabase/RootUser
+  MyDatabaseRootUserSecretAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref MyDatabaseRootUserSecret
+      TargetId: !Ref MyDatabase
+      TargetType: AWS::RDS::DBInstance
 Parameters:
   StackTagName:
     Type: String
