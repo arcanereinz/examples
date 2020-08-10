@@ -20,6 +20,7 @@ Resources:
             SecretArn: !Sub arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/${EnvironmentTagName}/*
         - S3CrudPolicy:
             BucketName: !Ref Bucket
+        - AWSLambdaENIManagementAccess
       Events:
         MyApiGET:
           Type: Api
@@ -42,6 +43,12 @@ Resources:
           BUCKET_ARN: !GetAtt Bucket.Arn
       Layers:
         - !Ref Layer
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt VirtualNetwork.DefaultSecurityGroup
+        SubnetIds:
+          - !Ref VirtualNetworkPrivateSubnet1
+          - !Ref VirtualNetworkPrivateSubnet2
   MyApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -78,6 +85,225 @@ Resources:
       BucketName: !Sub ${AWS::StackName}-bucket-${AWS::AccountId}
       WebsiteConfiguration:
         IndexDocument: index.html
+  VirtualNetwork:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName}
+            - ResourceName: VirtualNetwork
+  VirtualNetworkPrivateSubnet1:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs ''
+      CidrBlock: !Select
+        - 0
+        - !Cidr
+          - 10.0.0.0/16
+          - 4
+          - 14
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Private Subnet 1
+            - ResourceName: VirtualNetwork
+      VpcId: !Ref VirtualNetwork
+  VirtualNetworkPrivateSubnet2:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 1
+        - !GetAZs ''
+      CidrBlock: !Select
+        - 1
+        - !Cidr
+          - 10.0.0.0/16
+          - 4
+          - 14
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Private Subnet 2
+            - ResourceName: VirtualNetwork
+      VpcId: !Ref VirtualNetwork
+  VirtualNetworkPublicSubnet1:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 0
+        - !GetAZs ''
+      CidrBlock: !Select
+        - 2
+        - !Cidr
+          - 10.0.0.0/16
+          - 4
+          - 14
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Public Subnet 1
+            - ResourceName: VirtualNetwork
+      VpcId: !Ref VirtualNetwork
+  VirtualNetworkPublicSubnet2:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 1
+        - !GetAZs ''
+      CidrBlock: !Select
+        - 3
+        - !Cidr
+          - 10.0.0.0/16
+          - 4
+          - 14
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Public Subnet 2
+            - ResourceName: VirtualNetwork
+      VpcId: !Ref VirtualNetwork
+  VirtualNetworkPrivateSubnet1NatGatewayEIP:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+  VirtualNetworkPrivateSubnet1NatGateway:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt VirtualNetworkPrivateSubnet1NatGatewayEIP.AllocationId
+      SubnetId: !Ref VirtualNetworkPublicSubnet1
+  VirtualNetworkPrivateSubnet1RouteTable:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Private Subnet 1 Route Table
+            - ResourceName: VirtualNetwork
+      VpcId: !Ref VirtualNetwork
+  VirtualNetworkPrivateSubnet1NatGatewayRoute:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref VirtualNetworkPrivateSubnet1NatGateway
+      RouteTableId: !Ref VirtualNetworkPrivateSubnet1RouteTable
+  VirtualNetworkPrivateSubnet1RouteTableAssociation:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref VirtualNetworkPrivateSubnet1RouteTable
+      SubnetId: !Ref VirtualNetworkPrivateSubnet1
+  VirtualNetworkPrivateSubnet2NatGatewayEIP:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+  VirtualNetworkPrivateSubnet2NatGateway:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt VirtualNetworkPrivateSubnet2NatGatewayEIP.AllocationId
+      SubnetId: !Ref VirtualNetworkPublicSubnet2
+  VirtualNetworkPrivateSubnet2RouteTable:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Private Subnet 2 Route Table
+            - ResourceName: VirtualNetwork
+      VpcId: !Ref VirtualNetwork
+  VirtualNetworkPrivateSubnet2NatGatewayRoute:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref VirtualNetworkPrivateSubnet2NatGateway
+      RouteTableId: !Ref VirtualNetworkPrivateSubnet2RouteTable
+  VirtualNetworkPrivateSubnet2RouteTableAssociation:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref VirtualNetworkPrivateSubnet2RouteTable
+      SubnetId: !Ref VirtualNetworkPrivateSubnet2
+  VirtualNetworkPublicSubnetsInternetGateway:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Public Subnets Internet Gateway
+            - ResourceName: VirtualNetwork
+  VirtualNetworkPublicSubnetsInternetGatewayAttachment:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref VirtualNetworkPublicSubnetsInternetGateway
+      VpcId: !Ref VirtualNetwork
+  VirtualNetworkPublicSubnetsRouteTable:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - Stack ${StackTagName} Environment ${EnvironmentTagName} Virtual Network ${ResourceName} Public Subnets Route Table
+            - ResourceName: VirtualNetwork
+      VpcId: !Ref VirtualNetwork
+  VirtualNetworkPublicSubnetsInternetGatewayRoute:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref VirtualNetworkPublicSubnetsInternetGateway
+      RouteTableId: !Ref VirtualNetworkPublicSubnetsRouteTable
+  VirtualNetworkPublicSubnet1RouteTableAssociation:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref VirtualNetworkPublicSubnetsRouteTable
+      SubnetId: !Ref VirtualNetworkPublicSubnet1
+  VirtualNetworkPublicSubnet2RouteTableAssociation:
+    Metadata:
+      StackeryManaged: true
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref VirtualNetworkPublicSubnetsRouteTable
+      SubnetId: !Ref VirtualNetworkPublicSubnet2
 Parameters:
   StackTagName:
     Type: String
